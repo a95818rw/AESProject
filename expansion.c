@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 
-void printBytes(unsigned char b[], int len) {
+void printBytes(unsigned char b[], int len) {   //print出明文，密文或金鑰。
   int i;
   for (i=0; i<len; i++)
     printf("%d ", b[i]);
@@ -23,12 +23,12 @@ unsigned char AES_Sbox[] = {99,124,119,123,242,107,111,197,48,1,103,43,254,215,1
     137,13,191,230,66,104,65,153,45,15,176,84,187,22};  //SBOX
 
 
-void expansionKey(unsigned char key[], int keyLen){ //keylen = 16
+void expansionKey(unsigned char key[], int keyLen){ //金鑰位置，金鑰長度
         
         int i, j, rcon = 1, keyround = 16*(keyLen / 4 + 7); //keyround:16->11*16 24->13*16 32->15*16
-        unsigned char arrayL[4], arrayChange[4];
+        unsigned char arrayL[4], arrayChange[4];    //後面的陣列，轉換過的陣列。
 
-        printf("\n%d\n",keyround);  //16 -> 176
+        printf("\n%d\n",keyround);  //16->176 24->208 32->240
 
         for(i = keyLen; i < keyround; i += 4){
             memcpy(arrayL, &key[i-4], 4);
@@ -44,7 +44,7 @@ void expansionKey(unsigned char key[], int keyLen){ //keylen = 16
 
             }
 
-            else if((keyLen == 32) && (i % keyLen == 16)){  //using for 256
+            else if((keyLen == 32) && (i % keyLen == 16)){  //AES-256專用
                 arrayChange[0] = AES_Sbox[arrayL[0]];
                 arrayChange[1] = AES_Sbox[arrayL[1]];
                 arrayChange[2] = AES_Sbox[arrayL[2]];
@@ -53,7 +53,7 @@ void expansionKey(unsigned char key[], int keyLen){ //keylen = 16
             }
 
             for(j = 0; j < 4; j++){
-                key[i + j] = key[i + j - keyLen] ^ arrayL[j];//keyLen or 1??
+                key[i + j] = key[i + j - keyLen] ^ arrayL[j];
             }
 
         }
@@ -73,10 +73,10 @@ int main(){
     //下 key的選擇 選擇適用128,192還是256
     for(i = 0; i < 32; i++)
         key[i] = i;
-    keyLen = 32;
+    keyLen = 32;    //金鑰長度
     //上
 
-    expansionKey(key, keyLen); //16位
+    expansionKey(key, keyLen);
 
 
     printf("原始金鑰："); printBytes(key, keyLen);
