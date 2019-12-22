@@ -22,6 +22,8 @@ unsigned char AES_Sbox[] = {99,124,119,123,242,107,111,197,48,1,103,43,254,215,1
     158,225,248,152,17,105,217,142,148,155,30,135,233,206,85,40,223,140,161,
     137,13,191,230,66,104,65,153,45,15,176,84,187,22};  //SBOX
 
+unsigned char Inv_Sbox[256];
+
 unsigned char xtime[256];//shift and mod 0x1b
 
 
@@ -70,6 +72,12 @@ void byteSub(unsigned char text[]){
         text[i] = AES_Sbox[text[i]];
 }   //s_box轉換
 
+void invByteSub(unsigned char text[]){
+    int i;
+    for(i = 0;  i < 16; i++)
+        text[i] = Inv_Sbox[text[i]];
+}   //inv_s_box轉換
+
 void shiftRow(unsigned char text[]){
     int i, j, k;
     unsigned char copytext[16];
@@ -83,6 +91,22 @@ void shiftRow(unsigned char text[]){
 
         //(j + 4 - i) % 4 轉換到的位置copyText[(列 + 4 - 行) % 4]
         //ex:X(0,0)->X(0,0); X(1,0)->X(1,3); X(2,0)->X(2,2);
+    }
+}
+
+void invShiftRow(unsigned char text[]){
+    int i, j, k;
+    unsigned char copytext[16];
+    memcpy(copytext, text, 16);
+    for(i = 0; i < 16; i += 4){ //一列一列來
+            
+        text[i] = copytext [i];
+        text[i + 1] = copytext [(i + 13) % 16];
+        text[i + 2] = copytext [(i + 10) % 16];
+        text[i + 3] = copytext [(i + 7) % 16];
+
+        //(j + 4 - i) % 4 轉換到的位置copyText[(列 + 4 - 行) % 4]
+        //ex:X(0,0)->X(0,0); X(1,0)->X(1,1); X(2,0)->X(2,2);
     }
 }
 
@@ -101,6 +125,28 @@ void mixColumn(unsigned char text[]){
         text[i + 1] ^= x ^ xtime[t1 ^ t2];
         text[i + 2] ^= x ^ xtime[t2 ^ t3];
         text[i + 3] ^= x ^ xtime[t3 ^ t0];
+    }
+
+}
+
+void invMixColumn(unsigned char text[]){
+    
+    unsigned char t0, t1, t2, t3;
+    unsigned char x,xs,x1,x2;
+    int i;
+    for(i = 0; i < 16; i += 4){
+        t0 = text[i];
+        t1 = text[i + 1];
+        t2 = text[i + 2];
+        t3 = text[i + 3];
+        x = t0 ^ t1 ^ t2 ^ t3;
+        xs = xtime[x];
+        x1 = xtime[xtime[xs ^ t0 ^ t2]] ^ x;
+        x2 = xtime[xtime[xs ^ t1 ^ t3]] ^ x;
+        text[i] ^= x1 ^ xtime[t0 ^ t1];
+        text[i + 1] ^= x2 ^ xtime[t1 ^ t2];
+        text[i + 2] ^= x1 ^ xtime[t2 ^ t3];
+        text[i + 3] ^= x2 ^ xtime[t3 ^ t0];
     }
 
 }
@@ -128,13 +174,13 @@ int main(){
         plain_text[i] = 0x11 * i;   //建立明文
     for(i = 0; i < 32; i++)
         key[i] = i;     //建立金鑰
-    keyLen = 24;    //金鑰長度
+    keyLen = 32;    //金鑰長度
     int keyMaxLen = keyLen * 4 + 112;   //金鑰最大長度
 
     expansionKey(key, keyLen);
     printf("原始金鑰："); printBytes(key, keyLen);
     printf("展開金鑰："); printBytes(key, keyMaxLen); //金鑰擴展結束
-//-------------------------------round開始------------------------------------//
+//-------------------------------加密開始------------------------------------//
     for(i = 0; i < 128; i++) {
         xtime[i] = i << 1;
         xtime[128 + i] = (i << 1) ^ 0x1b;
@@ -145,6 +191,7 @@ int main(){
 
     addRoundKey(plain_text, key, 0);
     for(roundTime = 1; roundTime < roundMaxTime; roundTime++){
+        printf("%d\n",roundTime);
         round(plain_text, key, roundTime);
     }
     byteSub(plain_text);
@@ -153,4 +200,21 @@ int main(){
     
     printf("加密完後："); printBytes(plain_text, 16);
 
+//-------------------------------解密開始------------------------------------//
+    for(i = 0; i < 256; i++)
+        Inv_Sbox[AES_Sbox[i]] = i;
+
+    addRoundKey(plain_text, key, roundTime);
+    invShiftRow(plain_text);
+    invByteSub(plain_text);
+    for(roundTime = roundMaxTime - 1; roundTime >= 1; roundTime--){
+        printf("%d\n",roundTime);
+        addRoundKey(plain_text, key, roundTime);
+        invMixColumn(plain_text);
+        invShiftRow(plain_text);
+        invByteSub(plain_text);
+    }
+    addRoundKey(plain_text, key, 0);
+
+    printf("解密完後："); printBytes(plain_text, 16);
 }
